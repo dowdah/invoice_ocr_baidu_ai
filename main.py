@@ -10,6 +10,8 @@ import argparse
 API_KEY = os.environ.get('BAIDU_API_KEY')
 SECRET_KEY = os.environ.get('BAIDU_SECRET_KEY')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+SLEEP_TIME = 1  # Avoid exceeding QPS Unit: second
 BAIDU_ACCESS_TOKEN_API = "https://aip.baidubce.com/oauth/2.0/token"
 BAIDU_INVOICE_OCR_API = "https://aip.baidubce.com/rest/2.0/ocr/v1/vat_invoice"
 INVOICE_MAPPING = {'InvoiceCode': '发票代码', 'InvoiceNum': '发票号码', 'InvoiceDate': '开票日期',
@@ -91,15 +93,17 @@ def invoice_file_to_info(invoice_file_path):
             exit(1)
 
 
-def output_invoice_info(invoice_info, output_format="csv"):
+def output_invoice_info(raw_file_path, invoice_info, output_format="csv"):
     """
     输出发票信息到文件
+    :param raw_file_path: 原始文件路径，用于生成输出文件名
     :param invoice_info: 发票信息
     :param output_format: 输出格式
     :return: None
     """
-    output_file_name = f"{invoice_info['InvoiceCode']}_{invoice_info['InvoiceNum']}.{output_format}"
-    output_file_path = os.path.join(BASE_DIR, output_file_name)
+    # output_file_name = f"{invoice_info['InvoiceCode']}_{invoice_info['InvoiceNum']}.{output_format}"
+    output_file_name = f"{raw_file_path.split('/')[-1].split('.')[0]}.{output_format}"
+    output_file_path = os.path.join(OUTPUT_DIR, output_file_name)
     match output_format:
         case 'csv':
             with open(output_file_path, "w", newline="") as f:
@@ -117,10 +121,40 @@ def output_invoice_info(invoice_info, output_format="csv"):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='OCR for invoice file(img, pdf or ofd) using Baidu API.')
-    parser.add_argument('invoice_file_path', type=str, help='Path to the invoice file.')
+    parser = argparse.ArgumentParser(
+        description='OCR for invoice files (img, pdf, or ofd) using Baidu API with batch processing support.')
+    # 添加文件路径参数，允许多个值，但是这个参数是可选的
+    parser.add_argument('--files', metavar='FILE', type=str, nargs='+',
+                        help='Path(s) to the invoice file(s).')
+    # 添加文件夹路径参数，这个参数也是可选的
+    parser.add_argument('--folder', type=str, help='Directory path to process all invoice files within.')
+    # 添加格式参数
     parser.add_argument('--format', choices=['csv', 'json'], default='csv',
                         help='Output format: csv or json (default: csv).')
+    # 解析命令行参数
     args = parser.parse_args()
-    invoice_info = invoice_file_to_info(args.invoice_file_path)
-    output_invoice_info(invoice_info, args.format)
+    if args.folder:
+        # 如果提供了文件夹路径，遍历该文件夹下的所有文件
+        file_paths = [os.path.join(args.folder, f) for f in os.listdir(args.folder) if
+                      os.path.isfile(os.path.join(args.folder, f))]
+    elif args.files:
+        # 如果提供了文件路径列表，直接使用该列表
+        file_paths = args.files
+    else:
+        # 如果没有提供文件或文件夹路径，打印帮助信息并退出
+        parser.print_help()
+        exit(1)
+    # 创建输出文件夹
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+    # 处理每个文件
+    total_files = len(file_paths)
+    current_file = 0
+    for file_path in file_paths:
+        current_file += 1
+        print(f"[Info] Processing file {current_file}/{total_files}: {file_path}")
+        invoice_info = invoice_file_to_info(file_path)
+        output_invoice_info(file_path, invoice_info, args.format)
+        if current_file < total_files:
+            time.sleep(SLEEP_TIME)
+    print("[Info] Done")

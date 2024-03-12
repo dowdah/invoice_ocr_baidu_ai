@@ -164,4 +164,4 @@ cython_debug/
 .DS_Store
 .env
 access_token.json
-*.csv
+output/
