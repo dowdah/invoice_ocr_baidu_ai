@@ -1,65 +1,93 @@
-# Baidu Invoice OCR Utility
+# Baidu OCR Invoice Processing
 
-![Version: 1.0](https://img.shields.io/badge/Version-1.0-brightgreen?style=for-the-badge) [![中文文档](https://img.shields.io/badge/中文文档-brightgreen?style=for-the-badge)](README-zh.md)
+![Version: 1.1](https://img.shields.io/badge/Version-1.1-brightgreen?style=for-the-badge) [![中文文档](https://img.shields.io/badge/中文文档-brightgreen?style=for-the-badge)](README-zh.md)
 
-This Python utility leverages the Baidu OCR API to extract invoice details from image, PDF, or OFD files and outputs the information in CSV or JSON format.
+This script utilizes the Baidu OCR API to recognize and extract information from invoice documents, including images, PDFs, or OFD files. It offers the flexibility to process individual files, multiple files at once, or all files within a specified directory. The extracted invoice data can be saved in either CSV or JSON format.
 
 ## Features
 
-- OCR recognition of invoices from images, PDFs, or OFD files.
-- Outputs recognized invoice information in CSV or JSON format.
-- Command line interface for format specification.
+- Process individual or multiple files simultaneously.
+- Batch process all invoice files within a specified directory.
+- Support for CSV and JSON output formats.
 
 ## Prerequisites
 
-Before using this utility, ensure you have:
+- Python 3.10+(Developed with Python 3.11).
+- Pipenv for managing project dependencies.
 
-1. Python 3.10+ installed on your system.
-2. A Baidu Cloud account to obtain an API Key and Secret Key from the [Baidu AI](https://ai.baidu.com/).
-3. Set the `BAIDU_API_KEY` and `BAIDU_SECRET_KEY` as environment variables.
+## Setup
 
-## Setup and Installation
+### Dependencies
 
-This project uses Pipenv for managing dependencies. If you haven't installed Pipenv yet, install it globally with:
+The project uses `pipenv` for managing dependencies. To install `pipenv` if you haven't already, run:
 
 ```bash
 pip install pipenv
 ```
 
-To set up the project environment, follow these steps:
+After installing `pipenv`, navigate to the project directory and install the required dependencies:
 
-1. Clone the repository or download the script to your local machine.
-2. Navigate to the project directory and run `pipenv install` to install dependencies.
+```bash
+pipenv install
+```
+
+If you are not using Python 3.11, you may ignore pipfile when installing dependencies. **Note that this may lead to compatibility issues and under any circumstances, you must use Python 3.10+.**
+
+```bash
+pipenv install --ignore-pipfile
+```
+
+
+
+### Environment Variables
+
+You must set the `BAIDU_API_KEY` and `BAIDU_SECRET_KEY` environment variables with your Baidu OCR API credentials. You can set these variables in your shell or add them to a `.env` file in the project root:
+
+```env
+BAIDU_API_KEY='your_api_key_here'
+BAIDU_SECRET_KEY='your_secret_key_here'
+```
 
 ## Usage
 
-Activate the Pipenv shell and run the script with the following command:
+Activate the pipenv shell:
 
 ```bash
-pipenv run python main.py <path_to_invoice_file> [--format <output_format>]
+pipenv shell
 ```
 
-Parameters:
+### Processing Single or Multiple Files
 
-- `<path_to_invoice_file>`: The full path to the invoice file to be processed.
-- `<output_format>`: Optional. Specify the output format (`csv` or `json`). Default is `csv`.
-
-### Example
-
-To process an invoice and output in JSON format:
+To process a single file or multiple files, use the `--files` argument followed by the path(s) to the file(s):
 
 ```bash
-pipenv run python main.py /path/to/invoice.pdf --format json
+python main.py --files path/to/invoice1.pdf path/to/invoice2.jpg
+```
+
+### Directory Processing
+
+To process all invoice files within a directory, use the `--folder` argument:
+
+```bash
+python main.py --folder path/to/invoices_directory
+```
+
+### Output Format
+
+The script outputs data in CSV format by default. To output in JSON format, use the `--format` option:
+
+```bash
+python main.py --files path/to/invoice.pdf --format json
 ```
 
 ## Output
 
-The script saves the recognized invoice information in the specified format in the same directory as the script. The output file is named using the invoice code and number.
-
-## Error Handling
-
-The script includes error handling for missing API keys, network errors, and Baidu OCR API response errors. Make sure your API keys are correctly configured.
+Processed invoice data will be saved in the `output` directory within the project folder. The output files are named after the original files with an appropriate extension based on the chosen format.
 
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Disclaimer
+
+This tool is intended for educational and research purposes only. Please use it responsibly and ethically, adhering to the Baidu OCR API terms of service.

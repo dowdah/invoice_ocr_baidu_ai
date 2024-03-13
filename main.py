@@ -80,17 +80,17 @@ def invoice_file_to_info(invoice_file_path):
         response_json = requests.post(BAIDU_INVOICE_OCR_API, params=params, headers=headers, data=data).json()
     except:
         print("[Error] Network error")
-        exit(1)
+        return None
     else:
         if 'words_result' in response_json.keys():
             invoice_info = response_json["words_result"]
             return invoice_info
         elif 'error_code' in response_json.keys():
             print(f"[Error] Baidu: {response_json['error_msg']}")
-            exit(1)
+            return None
         else:
             print("[Error] Unknown error")
-            exit(1)
+            return None
 
 
 def output_invoice_info(raw_file_path, invoice_info, output_format="csv"):
@@ -154,7 +154,8 @@ if __name__ == '__main__':
         current_file += 1
         print(f"[Info] Processing file {current_file}/{total_files}: {file_path}")
         invoice_info = invoice_file_to_info(file_path)
-        output_invoice_info(file_path, invoice_info, args.format)
+        if invoice_info:
+            output_invoice_info(file_path, invoice_info, args.format)
         if current_file < total_files:
             time.sleep(SLEEP_TIME)
     print("[Info] Done")
