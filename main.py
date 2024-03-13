@@ -13,10 +13,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 SLEEP_TIME = 1  # Avoid exceeding QPS Unit: second
 BAIDU_ACCESS_TOKEN_API = "https://aip.baidubce.com/oauth/2.0/token"
-BAIDU_INVOICE_OCR_API = "https://aip.baidubce.com/rest/2.0/ocr/v1/vat_invoice"
+BAIDU_INVOICE_OCR_API = "https://aip.baidubce.com/rest/2.0/ocr/v1/vat_invoice"  # 增值税发票识别
+BAIDU_INVOICE_OCR_ADVANCED_API = "https://aip.baidubce.com/rest/2.0/ocr/v1/multiple_invoice"  # 智能财务票据识别
 INVOICE_MAPPING = {'InvoiceCode': '发票代码', 'InvoiceNum': '发票号码', 'InvoiceDate': '开票日期',
                    'TotalAmount': '发票金额(不含税)', 'AmountInFiguers': '发票金额(含税)', 'CheckCode': '校验码',
-                   'SellerRegisterNum': '纳税人识别号(销售方)', 'InvoiceTypeOrg': '发票类型'}
+                   'SellerRegisterNum': '纳税人识别号(销售方)', 'InvoiceTypeOrg': '发票类型', 'TotalTax': '税额'}
 
 if not (API_KEY and SECRET_KEY):
     print('[Error] BAIDU_API_KEY or BAIDU_SECRET_KEY missing! Please set environment variables properly.')
@@ -84,6 +85,63 @@ def invoice_file_to_info(invoice_file_path):
     else:
         if 'words_result' in response_json.keys():
             invoice_info = response_json["words_result"]
+            if (float(invoice_info['TotalAmount']) + float(invoice_info['TotalTax'])
+                    != float(invoice_info['AmountInFiguers']) or
+                    (float(invoice_info['TotalTax']) > float(invoice_info['TotalAmount']))):
+                print("[Info] Basic OCR failed, trying advanced OCR...")
+                invoice_info = invoice_file_to_info_advanced(invoice_file_path)
+                if invoice_info:
+                    return invoice_info
+                else:
+                    return None
+            return invoice_info
+        elif 'error_code' in response_json.keys():
+            print(f"[Error] Baidu: {response_json['error_msg']}")
+            return None
+        else:
+            print("[Error] Unknown error")
+            return None
+
+
+def invoice_file_to_info_advanced(invoice_file_path):
+    ext = invoice_file_path.split('.')[-1]
+    with open(invoice_file_path, "rb") as f:
+        file_content_processed = urllib.parse.quote_plus(base64.b64encode(f.read()).decode('utf8'))
+    if ext in ['ofd', 'OFD']:
+        data = f"ofd_file={ file_content_processed }&verify_parameter=false&probability=false&location=false"
+    elif ext in ['pdf', 'PDF']:
+        data = f"pdf_file={ file_content_processed }&verify_parameter=false&probability=false&location=false"
+    else:
+        data = f"image={ file_content_processed }&verify_parameter=false&probability=false&location=false"
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+    }
+    params = {
+        "access_token": get_access_token(),
+    }
+    try:
+        response_json = requests.post(BAIDU_INVOICE_OCR_ADVANCED_API, params=params, headers=headers, data=data).json()
+    except:
+        print("[Error] Network error")
+        return None
+    else:
+        if 'words_result' in response_json.keys():
+            invoice_info = response_json["words_result"][0]
+            for k, v in invoice_info['result'].items():
+                if v:
+                    invoice_info[k] = v[0]['word']
+                else:
+                    invoice_info[k] = v
+            del invoice_info['result']
+            if (float(invoice_info['TotalAmount']) + float(invoice_info['TotalTax'])
+                    != float(invoice_info['AmountInFiguers'])):
+                print("[Error] Advanced OCR failed")
+                return None
+            if float(invoice_info['TotalTax']) > float(invoice_info['TotalAmount']):
+                print("[Info] Error found in TotalAmount and TotalTax, automatically swapping...")
+                invoice_info['TotalAmount'], invoice_info['TotalTax'] = (
+                    invoice_info['TotalTax'], invoice_info['TotalAmount'])
             return invoice_info
         elif 'error_code' in response_json.keys():
             print(f"[Error] Baidu: {response_json['error_msg']}")
@@ -131,6 +189,9 @@ if __name__ == '__main__':
     # 添加格式参数
     parser.add_argument('--format', choices=['csv', 'json'], default='csv',
                         help='Output format: csv or json (default: csv).')
+    # 添加新参数，用于启用更高级的API接口
+    parser.add_argument('--advanced-ocr', action='store_true',
+                        help='Use the advanced API for processing the invoices.')
     # 解析命令行参数
     args = parser.parse_args()
     if args.folder:
@@ -153,7 +214,10 @@ if __name__ == '__main__':
     for file_path in file_paths:
         current_file += 1
         print(f"[Info] Processing file {current_file}/{total_files}: {file_path}")
-        invoice_info = invoice_file_to_info(file_path)
+        if args.advanced_ocr:
+            invoice_info = invoice_file_to_info_advanced(file_path)
+        else:
+            invoice_info = invoice_file_to_info(file_path)
         if invoice_info:
             output_invoice_info(file_path, invoice_info, args.format)
         if current_file < total_files:
