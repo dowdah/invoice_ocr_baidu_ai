@@ -191,7 +191,7 @@ if __name__ == '__main__':
                         help='Output format: csv or json (default: csv).')
     # 添加新参数，用于启用更高级的API接口
     parser.add_argument('--advanced-ocr', action='store_true',
-                        help='Use the advanced API for processing the invoices.')
+                        help='Use the advanced API for processing the invoices. Note that this cost more.')
     # 解析命令行参数
     args = parser.parse_args()
     if args.folder:
